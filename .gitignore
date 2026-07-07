@@ -1,0 +1,30 @@
+# === 编译产物 ===
+*.exe
+*.o
+*.obj
+*.out
+*.dll
+*.so
+*.dylib
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === 运行时文件 ===
+logs/
+index_store/
+
+# === 编辑器 / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === 操作系统 ===
+Thumbs.db
+Desktop.ini
+.DS_Store

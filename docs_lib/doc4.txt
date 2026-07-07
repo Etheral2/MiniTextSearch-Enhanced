@@ -1,0 +1,3 @@
+Programming in C requires careful memory management and modular design.
+Each module in this project handles one part of the text search pipeline.
+Good directory structure and clear interfaces make teamwork easier.

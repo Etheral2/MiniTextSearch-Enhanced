@@ -1,0 +1,3 @@
+Data structure design is important for building an efficient search index.
+A good index allows fast keyword lookup and ranking of matching documents.
+This project focuses on a lightweight text search engine implementation.

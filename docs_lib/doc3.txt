@@ -1,0 +1,3 @@
+The mini search engine reads documents, cleans the text and tokenizes each word.
+It then builds an inverted index and supports phrase search as a bonus feature.
+Benchmark testing measures the average response time for keyword queries.
