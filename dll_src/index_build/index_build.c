@@ -1,6 +1,24 @@
 #include "../../public/public.h"
 #include "index_build.h"
 
+/*
+ * 二进制索引文件格式 (index.dat)：
+ * ┌──────────────────────────────────────────────────┐
+ * │ Header:  magic "MTXT" (4B) ─ little-endian       │
+ * │          version      (4B) ─ 当前为 1              │
+ * │          word_count   (4B) ─ 词项总数              │
+ * ├──────────────────────────────────────────────────┤
+ * │ 每个词项:                                         │
+ * │   word_len  (1B)  ─ 字符串长度 (≤127)             │
+ * │   word      (N B) ─ UTF-8 编码词文本              │
+ * │   posCnt    (4B)  ─ 出现次数                      │
+ * │   pos[0..N] (各8B) ─ docId(4B) + position(4B)    │
+ * └──────────────────────────────────────────────────┘
+ *
+ * 内存映射 (mmap / MapViewOfFile) 实现零拷贝加载，
+ * 直接解析内存中的数据构建倒排索引链表。
+ */
+
 #ifdef _WIN32
 #include <windows.h>
 #else

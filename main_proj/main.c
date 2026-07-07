@@ -4,9 +4,19 @@
 #include "../dll_src/query_handle/query_handle.h"
 #include "../dll_src/rank_score/rank_score.h"
 #include "../dll_src/result_out/result_out.h"
+#ifdef _WIN32
 #include <windows.h>
+#endif
+#include <sys/stat.h>
+#include <dirent.h>
+#include <time.h>
 
 /* ==================== 时间戳辅助宏 ==================== */
+/*
+ * TIME_STAMP — 使用 QueryPerformanceCounter 记录程序各阶段耗时。
+ * g_baseTime 在程序启动时初始化，TIME_STAMP 输出的是相对于启动时刻的偏移量。
+ * 同时写入 stdout 和日志文件，方便调试和性能分析。
+ */
 #define TIME_STAMP(label, fp) do { \
     double _t = get_time_ms(); \
     printf("[TIMESTAMP] %s: %.3f ms\n", (label), _t - g_baseTime); \
@@ -15,10 +25,46 @@
 
 static double g_baseTime = 0.0;
 
+/*
+ * 检查索引文件是否过期：遍历 docs_lib，若有文档比索引文件更新，需重建。
+ * 返回 1 表示需要重建，0 表示索引是最新的。
+ */
+static int index_needs_rebuild(const char* index_path, const char* docs_dir)
+{
+    struct stat idx_st;
+    if (stat(index_path, &idx_st) != 0)
+        return 1;   /* 索引文件不存在，必须重建 */
+
+    DIR* dir = opendir(docs_dir);
+    if (!dir) return 1;
+
+    struct dirent* entry;
+    int doc_count = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;  /* 跳过 . .. 和隐藏文件 */
+
+        char full[MAX_FILENAME_LEN + 512];
+        snprintf(full, sizeof(full), "%s/%s", docs_dir, entry->d_name);
+
+        struct stat doc_st;
+        if (stat(full, &doc_st) == 0) {
+            doc_count++;
+            /* 比较修改时间：difftime > 0 表示 doc 比 index 新 */
+            if (difftime(doc_st.st_mtime, idx_st.st_mtime) > 0)
+                { closedir(dir); return 1; }
+        }
+    }
+    closedir(dir);
+    /* 如果目录为空也需重建（让后面流程报"未找到文档"） */
+    return (doc_count == 0) ? 1 : 0;
+}
+
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
+#endif
 
     /* 初始化全局基准时间 */
     g_baseTime = get_time_ms();
@@ -81,9 +127,15 @@ int main(int argc, char* argv[])
         log_write(logFp, "已加载 %d 篇文档", docCount);
     }
 
-    /* 步骤2：构建二进制索引并保存到 index_store/index.dat */
+    /* 步骤2：构建二进制索引（增量检查，若索引已是最新则跳过重建） */
     TIME_STAMP("开始构建索引", logFp);
-    build_save_index(docList, docCount, "./index_store/index.dat");
+    if (index_needs_rebuild("./index_store/index.dat", "./docs_lib")) {
+        build_save_index(docList, docCount, "./index_store/index.dat");
+        log_write(logFp, "索引已重建");
+    } else {
+        printf("[main] 索引文件已是最新，跳过重建\n");
+        log_write(logFp, "索引文件已是最新，跳过重建");
+    }
     TIME_STAMP("索引构建完成", logFp);
 
     WordNode* indexRoot = load_index_file("./index_store/index.dat");

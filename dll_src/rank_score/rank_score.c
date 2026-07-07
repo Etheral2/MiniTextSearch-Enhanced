@@ -44,6 +44,18 @@ static int doc_has_pos(WordNode* node, int docId, int targetPos)
 
 /* ---------- 对外接口实现 ---------- */
 
+/*
+ * TF-IDF 评分算法：
+ *   TF (词频) = 词在文档中的原始出现次数
+ *   IDF (逆文档频率) = log((N+1)/(df+1)) + 1  (平滑版本，避免 df=N 时 log0)
+ *   最终得分 = Σ TF × IDF  (所有查询词累加)
+ *
+ *   短语加分：若查询词位置连续 (如 "search engine" 两词相邻)，
+ *   在文档中查找连续出现的位置，匹配成功 +5.0 分
+ *
+ *   排序：插入排序（O(n²)），文档数量不大时比快排更简洁高效
+ */
+
 API int calc_rank_result(char keywords[][MAX_WORD_LEN], int word_cnt, int* pos_arr,
                           WordNode* index_root, int top_k, ScoreItem* out_rank)
 {

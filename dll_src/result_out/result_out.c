@@ -12,6 +12,13 @@
 
 /* ==================== 高精度计时 ==================== */
 
+/*
+ * Windows: QueryPerformanceCounter + QueryPerformanceFrequency，微秒级精度
+ * POSIX:   clock_gettime(CLOCK_MONOTONIC)，单调时钟不受系统时间调整影响
+ *
+ * 第一次调用时缓存频率值（static 变量），后续调用直接计算毫秒数。
+ */
+
 API double get_time_ms(void)
 {
 #ifdef _WIN32

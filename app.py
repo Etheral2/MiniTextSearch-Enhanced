@@ -1,3 +1,19 @@
+"""
+MiniTextSearch Web 网关 — Flask 应用
+
+    浏览器 ←→ Flask (app.py) ←→ mini_search.exe (C 搜索引擎)
+
+路由设计:
+  GET  /               — 返回搜索前端页面
+  GET  /api/search?q=  — 执行全文检索，返回 JSON
+  GET  /api/suggest?q= — 前缀补全建议
+
+PyInstaller 兼容:
+  - sys.frozen 检测打包环境，首次运行自动复制资源到 %APPDATA%/MiniTextSearch
+  - 使用 sys._MEIPASS 定位打包时的只读资源
+  - 使用 subprocess.run stdin 传参，避免 shell 管道命令注入
+"""
+
 from flask import Flask, request, jsonify
 import subprocess
 import os
@@ -6,7 +22,6 @@ import sys
 import shutil
 import webbrowser
 import threading
-import tempfile
 import logging
 import time
 from logging.handlers import RotatingFileHandler
@@ -99,22 +114,28 @@ app.logger.setLevel(logging.INFO)
 # ==================== C 引擎调用 ====================
 
 def run_exe_full_output(keyword):
-    """通过管道将关键词传给 C 引擎，返回 stdout 全文"""
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".txt")
-    os.close(tmp_fd)
-    cmd = f'(echo {keyword}) | "{EXE}" > "{tmp_path}"'
-    subprocess.run(
-        cmd,
-        shell=True,
-        cwd=APP_DIR,
-        encoding="utf-8",
-        errors="replace",
-        timeout=TIMEOUT
-    )
-    with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
-        full_text = f.read()
-    os.unlink(tmp_path)
-    return full_text
+    """
+    通过 stdin 将关键词传给 C 引擎，capture stdout 全文。
+    使用 subprocess.run 的 input 参数而非 shell 管道，避免命令注入。
+    """
+    try:
+        result = subprocess.run(
+            [EXE],
+            input=keyword,
+            capture_output=True,
+            cwd=APP_DIR,
+            encoding="utf-8",
+            errors="replace",
+            timeout=TIMEOUT
+        )
+        # C 引擎的搜索输出混合在 stdout 和 stderr 中，合并返回
+        return (result.stdout or "") + (result.stderr or "")
+    except subprocess.TimeoutExpired:
+        app.logger.error(f"查询超时: '{keyword}' (>{TIMEOUT}s)")
+        return ""
+    except FileNotFoundError:
+        app.logger.error(f"C 引擎未找到: {EXE}")
+        return ""
 
 
 def run_exe_suggest(prefix):

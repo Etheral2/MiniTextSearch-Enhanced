@@ -188,6 +188,16 @@ API int parse_query_sentence(const char* input_sent, char out_keywords[][MAX_WOR
 }
 
 /* ==================== LRU 缓存实现 ==================== */
+/*
+ * 设计思路：
+ *   哈希表 + 双向链表，实现 O(1) 的查找、插入和淘汰。
+ *   - 哈希表：256 个桶，djb2 哈希，链地址法
+ *   - 双向链表：头部为最近使用 (MRU)，尾部为最久未使用 (LRU)
+ *   - 淘汰策略：缓存满时从尾部移除，每次命中将条目移至头部
+ *
+ *   缓存以原始查询字符串为键，存储排序后的 ScoreItem[] 数组。
+ *   固定容量 100 条，超过容量自动淘汰。
+ */
 
 static LRUCache g_cache;
 static int    g_cacheHits = 0;

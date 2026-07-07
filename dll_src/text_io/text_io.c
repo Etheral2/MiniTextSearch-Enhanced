@@ -48,7 +48,19 @@ static int my_strncasecmp(const char* a, const char* b, size_t n)
 }
 
 /* ==================== 最小化 inflate（RFC 1950/1951） ==================== */
-/* 内嵌轻量版 zlib/inflate，用于 PDF FlateDecode 和 DOCX ZIP 解压，无需外部依赖。 */
+/*
+ * 内嵌轻量版 inflate 解压缩算法，用于 PDF FlateDecode 和 DOCX ZIP 解压。
+ *
+ * 算法核心流程：
+ *   1. 读取块头（bfinal + btype），识别三种块类型
+ *   2. type=0: 未压缩块，直接拷贝
+ *   3. type=1: 固定 Huffman 码表（RFC 1951 3.2.6 预定义）
+ *   4. type=2: 动态 Huffman 码表，先解码码长序列再重建树
+ *   5. 每个 LZ77 码字解码为 (length, distance) 对，回退拷贝
+ *
+ * zlib 包装 (tinf_zlib_uncompress): 2 字节头 + 原始 deflate + 4 字节 Adler32
+ *
+ * 参考: RFC 1950 (zlib), RFC 1951 (deflate) */
 
 #define TINF_OK      0
 #define TINF_ERR    -1
@@ -1124,11 +1136,16 @@ static int parse_docx_to_text(const char* filepath, char* out, int maxOut)
 /* ==================== 中英文混合分词器 ==================== */
 
 /*
- * 分词策略：
+ * 中英文混合分词策略：
  *   - ASCII/拉丁字母：累积成英文单词（空白/标点分隔），转小写，过滤停用词
- *   - CJK 汉字：每个单字作为一个词元 (unigram)，相邻 CJK 字符组成二元组 (bigram)
- *   - 混合文本：在 CJK 和 ASCII 交界处自动切换
- *   - CJK 标点：视为分隔符
+ *   - CJK 汉字 (U+4E00–U+9FFF, 扩展A/B)：每个单字作为一个词元 (unigram)，
+ *     相邻 CJK 字符两两组合为二元组 (bigram)。例如"搜索引擎"产生：
+ *     ["搜","搜索","索","索引","引","引擎","擎"]
+ *   - CJK 标点：视为分隔符，触发 CJK 缓冲区的刷新
+ *   - 混合文本：CJK↔ASCII 交界处自动切换，切换时刷新已有缓冲区
+ *
+ * 为什么用 Bigram：中文无明显词边界，单字粒度太细，Bigram 能捕获
+ * 常见双字组合，在召回率和准确率之间取得平衡。
  */
 
 /* 添加一个词元到文档的 words 数组（带停用词过滤） */
