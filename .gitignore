@@ -1,5 +1,6 @@
-# === CMake 构建目录 ===
+# === CMake / PyInstaller 构建目录 ===
 build/
+dist/
 
 # === 编译产物 ===
 *.exe
