@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-MiniTextSearch Enhanced — a lightweight C-based full-text search engine with a Flask web frontend. It indexes `.txt` documents and supports Chinese-English mixed tokenization, TF-IDF ranking, binary mmap indexes, and LRU query caching.
+MiniTextSearch Enhanced — a lightweight C-based full-text search engine with a Flask web frontend. It indexes `.txt`, `.html`, `.pdf`, and `.docx` documents and supports Chinese-English mixed tokenization, TF-IDF ranking, binary mmap indexes, and LRU query caching.
 
 ## Build & run
 
@@ -58,7 +58,7 @@ The suggest mode (`./mini_search.exe suggest <prefix>`) bypasses the pipeline: i
 
 | Module | Role |
 |---|---|
-| `text_io` | Document I/O, UTF-8 CJK detection (U+4E00–U+9FFF, extensions A/B), bigram splitting for Chinese, whitespace splitting for English, stopword loading from `stopwords.txt` |
+| `text_io` | Document I/O, UTF-8 CJK detection (U+4E00–U+9FFF, extensions A/B), bigram splitting for Chinese, whitespace splitting for English, stopword loading from `stopwords.txt`. Parsers for HTML (tag stripping + entity decode), PDF (BT/ET text blocks + FlateDecode decompression), DOCX (ZIP extraction + XML text) — all via embedded inflate, no external deps. |
 | `index_build` | Binary index serialization (magic `MTXT` / 0x5458544D, little-endian uint32), mmap loading via `CreateFileMapping` (Windows) or `mmap` (POSIX), inverted-index linked-list construction |
 | `query_handle` | Query tokenization (duplicated UTF-8 helpers — intentional module isolation), LRU cache (256-bucket hash table + doubly-linked list, score-only results) |
 | `rank_score` | TF-IDF scoring: TF = raw term frequency, IDF = log(N/df), plus adjacency bonus for consecutive keyword positions in docs matching query order |
@@ -102,4 +102,31 @@ The Flask app writes to `logs/flask.log` via `RotatingFileHandler` (1 MB, 3 back
 - **Timing in main.c**: The `TIME_STAMP` macro relies on a static `g_baseTime` captured at program start via `get_time_ms()`. Each `TIME_STAMP` call prints the delta from `g_baseTime`. If `g_baseTime` is not initialized before use, timestamps will be wrong.
 - **Suggest mode bypass**: `./mini_search.exe suggest <prefix>` rebuilds the entire index from scratch on every invocation (load docs → build index → scan WordNode list). It does not use the cache or any persisted index state, making it relatively slow for large document sets.
 - **benchmark_test() independence**: `benchmark_test()` internally reloads documents and rebuilds the index from `docs_lib/` — it does not reuse the already-loaded data from the calling pipeline. This means benchmark times include I/O overhead.
-- **Version control**: The project is tracked with Git. `.gitignore` excludes compiled binaries (`*.exe`, `*.o`), Python artifacts (`__pycache__/`), runtime directories (`logs/`, `index_store/`), and editor config (`.vscode/`).
+- **Multi-format support**: `load_clean_text()` auto-detects file type by extension: `.txt` (direct read), `.html/.htm` (tag stripping + entity decode, `<script>`/`<style>` blocks skipped), `.pdf` (BT/ET text blocks, FlateDecode streams decompressed), `.docx` (ZIP structure parsed, `word/document.xml` extracted and deflated). All parsers are internal — no external libraries required. Extracted text flows into the existing `to_lower` + `tokenize_doc` pipeline unchanged.
+- **Embedded inflate**: A minimal RFC 1950/1951 inflate (~150 lines) at the top of `text_io.c` handles both zlib-wrapped (PDF) and raw-deflate (ZIP/DOCX) decompression. No `-lz` dependency needed.
+## Git version control
+
+The project is tracked with Git on branch `master`. `.gitignore` excludes compiled binaries (`*.exe`, `*.o`), Python artifacts (`__pycache__/`), runtime directories (`logs/`, `index_store/`), and editor config (`.vscode/`).
+
+```bash
+# View commit history
+git log --oneline
+
+# Check working tree status
+git status
+
+# Stage and commit changes
+git add <file>
+git commit -m "描述信息"
+
+# Undo unstaged changes to a file
+git checkout -- <file>
+
+# Create and switch to a new branch
+git checkout -b <branch-name>
+
+# Switch back to master
+git checkout master
+```
+
+Git user identity is set locally (not global): `git config user.name` / `git config user.email` within the repo.

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>测试HTML文档</title>
+</head>
+<body>
+    <h1>全文搜索引擎测试</h1>
+    <p>这是一个<b>HTML</b>格式的测试文档，用于验证搜索引擎的HTML解析功能。</p>
+    <p>搜索引擎可以处理中文和English混合文本，并提取纯文本内容。</p>
+    <div>
+        <ul>
+            <li>支持TF-IDF排序算法</li>
+            <li>支持中文分词和二元组</li>
+            <li>支持LRU缓存加速</li>
+        </ul>
+    </div>
+    <p>Tags like &lt;script&gt; and &lt;style&gt; should be stripped.</p>
+    <script>console.log("this should not appear in search results");</script>
+    <style>body { color: red; }</style>
+    <p>Final paragraph with &amp; &lt; &gt; &quot; entities decoded.</p>
+</body>
+</html>
